@@ -24,6 +24,9 @@ Desktop.ini
 server/data/uploads/*
 !server/data/uploads/.gitkeep
 
+# API 配置（含密钥，切勿提交）
+server/config.json
+
 # 日志
 *.log
 
