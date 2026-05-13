@@ -1,7 +1,14 @@
 """
-博客内容生成服务 - 基于选中的热点和参数生成结构化博客
+博客内容生成服务 - 支持 AI API 调用 + 模板回退
 """
+import json
+import logging
 import random
+from urllib import request, error
+
+from services.config import get_ai_config, is_ai_configured
+
+logger = logging.getLogger(__name__)
 
 STYLE_CONFIG = {
     "professional": {"tone": "严谨专业、逻辑清晰", "intro": "深入剖析", "prefix": "从专业视角审视"},
@@ -36,6 +43,86 @@ EXTRA_SECTION = {
 }
 
 
+def _call_ai_api(topic_titles, topic_content, style, word_count, depth):
+    """调用 AI API 生成博客内容"""
+    cfg = get_ai_config()
+    base_url = cfg.get("base_url", "").rstrip("/")
+    api_key = cfg.get("api_key", "")
+    model = cfg.get("model", "gpt-3.5-turbo")
+
+    st = STYLE_CONFIG.get(style, STYLE_CONFIG["professional"])
+    dp = DEPTH_CONFIG.get(depth, DEPTH_CONFIG["deep"])
+
+    word_ranges = {"short": "300-500", "standard": "800-1200", "long": "1500-2000"}
+    wc = word_ranges.get(word_count, "800-1200")
+
+    system_prompt = (
+        f"你是一个专业的博客写手。请根据以下热点话题创作一篇高质量的博客文章。"
+        f"写作风格：{st['tone']}。字数范围：{wc}字。"
+    )
+
+    user_prompt = (
+        f"热点话题：{topic_titles}\n"
+        f"话题摘要：{topic_content}\n\n"
+        f"请以 JSON 格式返回以下结构（不要包含其他内容）：\n"
+        f'{{"title":"文章主标题","subtitle":"副标题",'
+        f'"introduction":"引言段落",'
+        f'"sections":[{{"heading":"小标题","content":"段落内容"}}, ...],'
+        f'"conclusion":"结语段落"}}'
+    )
+
+    payload = json.dumps({
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ],
+        "temperature": 0.8,
+        "max_tokens": 3000
+    }).encode("utf-8")
+
+    url = f"{base_url}/chat/completions"
+    req = request.Request(url, data=payload, method="POST")
+    req.add_header("Content-Type", "application/json")
+    req.add_header("Authorization", f"Bearer {api_key}")
+
+    try:
+        with request.urlopen(req, timeout=60) as resp:
+            result = json.loads(resp.read().decode("utf-8"))
+            content = result["choices"][0]["message"]["content"]
+            return _parse_ai_response(content)
+    except error.HTTPError as e:
+        logger.error(f"AI API HTTP 错误: {e.code} - {e.read().decode('utf-8', errors='replace')[:300]}")
+    except Exception as e:
+        logger.error(f"AI API 调用失败: {e}")
+    return None
+
+
+def _parse_ai_response(text):
+    """解析 AI 返回的 JSON 文本"""
+    text = text.strip()
+    if text.startswith("```"):
+        lines = text.split("\n")
+        text = "\n".join(lines[1:]) if lines[0].startswith("```") else text
+        if text.endswith("```"):
+            text = text[:-3]
+
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    try:
+        start = text.find("{")
+        end = text.rfind("}") + 1
+        if start >= 0 and end > start:
+            return json.loads(text[start:end])
+    except json.JSONDecodeError:
+        pass
+
+    return None
+
+
 def generate_blog(topics, style="professional", word_count="standard", depth="deep"):
     if not topics:
         return None
@@ -46,7 +133,15 @@ def generate_blog(topics, style="professional", word_count="standard", depth="de
     st = STYLE_CONFIG.get(style, STYLE_CONFIG["professional"])
     dp = DEPTH_CONFIG.get(depth, DEPTH_CONFIG["deep"])
 
-    # 构建引言
+    if is_ai_configured():
+        logger.info(f"使用 AI API 生成博客: {topic_titles[:30]}...")
+        ai_result = _call_ai_api(topic_titles, topic_content, style, word_count, depth)
+        if ai_result:
+            if isinstance(ai_result, dict) and "title" in ai_result:
+                return ai_result
+
+    logger.info("使用模板引擎生成博客")
+
     introduction = (
         f"在信息爆炸的时代，{topic_titles}等话题持续占据热搜榜单，引发了社会各界的广泛关注和讨论。"
         f"{dp['analysis']}，我们或许能从中发现时代的脉搏和未来的方向。"
@@ -56,7 +151,6 @@ def generate_blog(topics, style="professional", word_count="standard", depth="de
     if word_count == "short":
         introduction = f"{topic_titles}成为近期热门话题，引发了广泛关注。{dp['analysis']}。"
 
-    # 构建正文段落
     num_sections = dp["sections"]
     sections = []
     for i in range(num_sections):
@@ -66,14 +160,12 @@ def generate_blog(topics, style="professional", word_count="standard", depth="de
             "content": sec["template"].format(topics=topic_titles)
         })
 
-    # 长博客追加延伸段落
     if word_count == "long":
         sections.append({
             "heading": EXTRA_SECTION["heading"],
             "content": EXTRA_SECTION["template"].format(topics=topic_titles)
         })
 
-    # 结语
     conclusion = (
         f"综上所述，{topic_titles}不仅是当下热议的话题，更代表了社会发展的某种趋势。"
         f"我们应当保持开放的心态，在关注热点的同时，也要有自己的独立思考。"
@@ -85,5 +177,6 @@ def generate_blog(topics, style="professional", word_count="standard", depth="de
         "subtitle": f"基于{dp['label']} | {st['tone']} | 目标字数：{word_count}字",
         "introduction": introduction,
         "sections": sections,
-        "conclusion": conclusion
+        "conclusion": conclusion,
+        "source": "template"
     }

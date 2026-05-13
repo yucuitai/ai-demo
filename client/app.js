@@ -500,6 +500,136 @@ function init() {
             updatePreview();
         });
     });
+
+    // ——— API 设置面板 ———
+    const settingsOverlay = document.getElementById('settingsOverlay');
+    const closeSettingsBtn = document.getElementById('closeSettingsBtn');
+
+    document.getElementById('settingsBtn').addEventListener('click', openSettings);
+    closeSettingsBtn.addEventListener('click', () => { settingsOverlay.classList.add('hidden'); });
+    settingsOverlay.addEventListener('click', (e) => {
+        if (e.target === settingsOverlay) settingsOverlay.classList.add('hidden');
+    });
+
+    document.getElementById('saveAiConfigBtn').addEventListener('click', saveAiConfig);
+    document.getElementById('saveImageConfigBtn').addEventListener('click', saveImageConfig);
+
+    loadConfig();
+
+    document.getElementById('imageDescInput').addEventListener('input', () => {
+        const desc = document.getElementById('imageDescInput').value.trim();
+        document.getElementById('generateImagesBtn').innerHTML = desc
+            ? '<i class="fa fa-paint-brush"></i> 生成 "' + desc.slice(0, 12) + (desc.length > 12 ? '...' : '') + '" 图片'
+            : '<i class="fa fa-paint-brush"></i> 生成 AI 图片';
+    });
+}
+
+async function openSettings() {
+    document.getElementById('settingsOverlay').classList.remove('hidden');
+    await loadConfig();
+}
+
+async function loadConfig() {
+    try {
+        const resp = await apiGet('/config');
+        // 文本 AI
+        if (resp.ai) {
+            document.getElementById('aiBaseUrl').value = resp.ai.base_url || 'https://api.openai.com/v1';
+            document.getElementById('aiModel').value = resp.ai.model || 'gpt-3.5-turbo';
+            const aiStatus = document.getElementById('aiStatus');
+            const aiKeyHint = document.getElementById('aiKeyHint');
+            if (resp.ai.api_key_set) {
+                aiStatus.className = 'ml-auto px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-700';
+                aiStatus.textContent = '已配置';
+                aiKeyHint.textContent = '已配置: ' + (resp.ai.api_key || '****');
+                aiKeyHint.classList.remove('hidden');
+                document.getElementById('aiApiKey').placeholder = '已配置（留空不修改）';
+            } else {
+                aiStatus.className = 'ml-auto px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-500';
+                aiStatus.textContent = '未配置';
+                aiKeyHint.classList.add('hidden');
+                document.getElementById('aiApiKey').placeholder = 'sk-xxxxxxxxxxxxxxxx';
+            }
+        }
+        // 图片 AI
+        if (resp.image) {
+            document.getElementById('imageBaseUrl').value = resp.image.base_url || 'https://api.openai.com/v1';
+            document.getElementById('imageModel').value = resp.image.model || 'dall-e-3';
+            const imgStatus = document.getElementById('imageStatus');
+            const imgKeyHint = document.getElementById('imageKeyHint');
+            if (resp.image.api_key_set) {
+                imgStatus.className = 'ml-auto px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-700';
+                imgStatus.textContent = '已配置';
+                imgKeyHint.textContent = '已配置: ' + (resp.image.api_key || '****');
+                imgKeyHint.classList.remove('hidden');
+                document.getElementById('imageApiKey').placeholder = '已配置（留空不修改）';
+            } else {
+                imgStatus.className = 'ml-auto px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-500';
+                imgStatus.textContent = '未配置';
+                imgKeyHint.classList.add('hidden');
+                document.getElementById('imageApiKey').placeholder = 'sk-xxxxxxxxxxxxxxxx';
+            }
+        }
+    } catch (e) {
+        console.error('加载配置失败:', e);
+    }
+}
+
+async function saveAiConfig() {
+    const data = {
+        base_url: document.getElementById('aiBaseUrl').value.trim(),
+        model: document.getElementById('aiModel').value.trim()
+    };
+    const key = document.getElementById('aiApiKey').value.trim();
+    if (key) data.api_key = key;
+
+    if (!data.base_url || !data.model) {
+        showToast('API 地址和模型名称不能为空', 'error');
+        return;
+    }
+
+    try {
+        await apiPut('/config/ai', data);
+        showToast('AI 文本生成配置已保存！');
+        await loadConfig();
+    } catch (e) {
+        showToast('保存失败: ' + e.message, 'error');
+    }
+}
+
+async function saveImageConfig() {
+    const data = {
+        base_url: document.getElementById('imageBaseUrl').value.trim(),
+        model: document.getElementById('imageModel').value.trim()
+    };
+    const key = document.getElementById('imageApiKey').value.trim();
+    if (key) data.api_key = key;
+
+    if (!data.base_url || !data.model) {
+        showToast('API 地址和模型名称不能为空', 'error');
+        return;
+    }
+
+    try {
+        await apiPut('/config/image', data);
+        showToast('AI 图片生成配置已保存！');
+        await loadConfig();
+    } catch (e) {
+        showToast('保存失败: ' + e.message, 'error');
+    }
+}
+
+async function apiPut(path, body) {
+    const resp = await fetch(API_BASE + path, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+    });
+    if (!resp.ok) {
+        const err = await resp.json().catch(() => ({ error: '请求失败' }));
+        throw new Error(err.error || `HTTP ${resp.status}`);
+    }
+    return resp.json();
 }
 
 document.addEventListener('DOMContentLoaded', init);
