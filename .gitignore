@@ -1,0 +1,31 @@
+# 字节码
+__pycache__/
+*.py[cod]
+*.pyo
+
+# 环境
+.env
+.venv/
+venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# 上传文件
+server/data/uploads/*
+!server/data/uploads/.gitkeep
+
+# 日志
+*.log
+
+# 依赖
+node_modules/

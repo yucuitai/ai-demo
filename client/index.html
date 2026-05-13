@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>博客智能体 - AI 图文博客生成工具</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="p-4 md:p-8">
+    <div class="max-w-7xl mx-auto">
+        
+        <!-- 顶部导航栏 -->
+        <header class="glass-effect rounded-2xl p-6 mb-6 fade-in">
+            <div class="flex items-center justify-between flex-wrap gap-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
+                        <i class="fa fa-pencil-square-o text-2xl text-white"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-2xl font-bold text-gray-800">博客智能体</h1>
+                        <p class="text-sm text-gray-500">AI 驱动的图文博客生成工具</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <button id="refreshBtn" class="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors">
+                        <i class="fa fa-refresh"></i>
+                        <span>刷新热点</span>
+                    </button>
+                    <button id="helpBtn" class="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors">
+                        <i class="fa fa-question-circle"></i>
+                        <span>帮助</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- 主要内容区域 -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            <!-- 左侧：热点选择面板 -->
+            <div class="lg:col-span-5 fade-in" style="animation-delay: 0.1s;">
+                <div class="glass-effect rounded-2xl p-6 h-full">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                            <i class="fa fa-fire text-orange-500"></i>
+                            热门话题
+                        </h2>
+                        <span id="selectedCount" class="text-sm text-blue-600 font-medium bg-blue-100 px-3 py-1 rounded-full">
+                            已选择 0 个
+                        </span>
+                    </div>
+                    
+                    <!-- 搜索和筛选 -->
+                    <div class="mb-4 space-y-3">
+                        <div class="relative">
+                            <i class="fa fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                            <input id="searchInput" type="text" placeholder="搜索热点话题..." 
+                                class="w-full pl-12 pr-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 focus:outline-none transition-colors">
+                        </div>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <button class="category-btn px-3 py-1.5 rounded-lg text-sm bg-blue-500 text-white" data-category="all">全部</button>
+                            <button class="category-btn px-3 py-1.5 rounded-lg text-sm bg-gray-100 text-gray-700 hover:bg-gray-200" data-category="tech">科技</button>
+                            <button class="category-btn px-3 py-1.5 rounded-lg text-sm bg-gray-100 text-gray-700 hover:bg-gray-200" data-category="life">生活</button>
+                            <button class="category-btn px-3 py-1.5 rounded-lg text-sm bg-gray-100 text-gray-700 hover:bg-gray-200" data-category="entertainment">娱乐</button>
+                            <button class="category-btn px-3 py-1.5 rounded-lg text-sm bg-gray-100 text-gray-700 hover:bg-gray-200" data-category="career">职场</button>
+                        </div>
+                    </div>
+                    
+                    <!-- 快速操作 -->
+                    <div class="flex items-center gap-2 mb-4 pb-4 border-b border-gray-100">
+                        <button id="selectAllBtn" class="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1">
+                            <i class="fa fa-check-square-o"></i> 全选
+                        </button>
+                        <span class="text-gray-300">|</span>
+                        <button id="clearSelectionBtn" class="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1">
+                            <i class="fa fa-square-o"></i> 清空
+                        </button>
+                    </div>
+                    
+                    <!-- 热点列表 -->
+                    <div id="topicsList" class="space-y-3 max-h-[500px] overflow-y-auto pr-2">
+                        <div class="text-center py-8 text-gray-400">
+                            <i class="fa fa-spinner fa-spin text-2xl mb-3"></i>
+                            <p>正在加载热点...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 右侧：博客生成与编辑区 -->
+            <div class="lg:col-span-7 fade-in" style="animation-delay: 0.2s;">
+                <div class="glass-effect rounded-2xl p-6">
+                    
+                    <!-- Tabs 切换 -->
+                    <div class="flex items-center gap-6 mb-6 border-b border-gray-100 pb-4">
+                        <button class="tab-btn tab-active pb-3" data-tab="editor">
+                            <i class="fa fa-edit mr-2"></i> 编辑
+                        </button>
+                        <button class="tab-btn pb-3 text-gray-500 hover:text-gray-700" data-tab="preview">
+                            <i class="fa fa-eye mr-2"></i> 预览
+                        </button>
+                        <button class="tab-btn pb-3 text-gray-500 hover:text-gray-700" data-tab="images">
+                            <i class="fa fa-image mr-2"></i> 图片
+                        </button>
+                    </div>
+                    
+                    <!-- 内容编辑 Tab -->
+                    <div id="editorTab" class="tab-content">
+                        <!-- 参数设置 -->
+                        <div class="bg-gray-50 rounded-xl p-4 mb-6">
+                            <h3 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                                <i class="fa fa-sliders"></i>
+                                生成参数
+                            </h3>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label class="block text-sm text-gray-600 mb-1.5">内容风格</label>
+                                    <select id="styleSelect" class="w-full px-3 py-2.5 rounded-lg border border-gray-200 bg-white">
+                                        <option value="professional">严肃专业</option>
+                                        <option value="casual">轻松活泼</option>
+                                        <option value="educational">干货科普</option>
+                                        <option value="emotional">情感叙事</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-600 mb-1.5">字数控制</label>
+                                    <select id="wordCountSelect" class="w-full px-3 py-2.5 rounded-lg border border-gray-200 bg-white">
+                                        <option value="short">短博客 (300-500)</option>
+                                        <option value="standard" selected>标准博客 (800-1200)</option>
+                                        <option value="long">长博客 (1500-2000)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-600 mb-1.5">内容深度</label>
+                                    <select id="depthSelect" class="w-full px-3 py-2.5 rounded-lg border border-gray-200 bg-white">
+                                        <option value="basic">基础简述</option>
+                                        <option value="deep" selected>深度解析</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 内容编辑器 -->
+                        <div class="mb-6">
+                            <h3 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                                <i class="fa fa-file-text-o"></i>
+                                博客内容
+                            </h3>
+                            <textarea id="blogEditor" rows="14" placeholder="点击下方按钮生成博客内容，或直接在这里编写..."
+                                class="w-full px-4 py-3 rounded-xl border border-gray-200 resize-none"></textarea>
+                        </div>
+                    </div>
+                    
+                    <!-- 预览 Tab -->
+                    <div id="previewTab" class="tab-content hidden">
+                        <!-- 排版控制栏 -->
+                        <div class="flex items-center gap-3 mb-4 pb-3 border-b border-gray-100 flex-wrap">
+                            <span class="text-xs text-gray-500 flex items-center gap-1">
+                                <i class="fa fa-image"></i> 图片排版:
+                            </span>
+                            <button class="align-btn px-3 py-1.5 rounded-lg text-xs bg-blue-100 text-blue-700" data-align="center">
+                                <i class="fa fa-align-center mr-1"></i>居中
+                            </button>
+                            <button class="align-btn px-3 py-1.5 rounded-lg text-xs bg-gray-100 text-gray-600" data-align="left">
+                                <i class="fa fa-align-left mr-1"></i>居左
+                            </button>
+                            <button class="align-btn px-3 py-1.5 rounded-lg text-xs bg-gray-100 text-gray-600" data-align="right">
+                                <i class="fa fa-align-right mr-1"></i>居右
+                            </button>
+                            <span class="text-gray-300 mx-2">|</span>
+                            <span class="text-xs text-gray-500 flex items-center gap-1">
+                                <i class="fa fa-columns"></i> 排版:
+                            </span>
+                            <button class="layout-btn px-3 py-1.5 rounded-lg text-xs bg-blue-100 text-blue-700" data-layout="default">
+                                <i class="fa fa-file-text-o mr-1"></i>标准
+                            </button>
+                            <button class="layout-btn px-3 py-1.5 rounded-lg text-xs bg-gray-100 text-gray-600" data-layout="magazine">
+                                <i class="fa fa-book mr-1"></i>杂志
+                            </button>
+                            <button class="layout-btn px-3 py-1.5 rounded-lg text-xs bg-gray-100 text-gray-600" data-layout="compact">
+                                <i class="fa fa-list-alt mr-1"></i>紧凑
+                            </button>
+                        </div>
+                        <div id="blogPreview" class="preview-container rounded-xl p-6 md:p-10 min-h-[400px]">
+                            <div class="text-center text-gray-400 py-12">
+                                <i class="fa fa-file-text-o text-4xl mb-3"></i>
+                                <p>生成博客后可在此预览效果</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 图片 Tab -->
+                    <div id="imagesTab" class="tab-content hidden">
+                        <div class="space-y-6">
+                            <!-- AI 图片生成 -->
+                            <div>
+                                <h3 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                                    <i class="fa fa-magic"></i>
+                                    AI 生成图片
+                                </h3>
+                                <!-- 自定义描述输入 -->
+                                <div class="mb-4">
+                                    <label class="block text-sm text-gray-600 mb-1.5">图片描述（可选）</label>
+                                    <input id="imageDescInput" type="text" placeholder="描述你想要的图片内容，如：赛博朋克都市、极简办公桌面..."
+                                        class="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:border-blue-500 focus:outline-none text-sm">
+                                </div>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                                    <div>
+                                        <label class="block text-sm text-gray-600 mb-1.5">图片风格</label>
+                                        <select id="imageStyleSelect" class="w-full px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm">
+                                            <option value="realistic">写实风格</option>
+                                            <option value="illustration">插画风格</option>
+                                            <option value="minimal">简约风格</option>
+                                            <option value="tech">科技风格</option>
+                                            <option value="cyberpunk">赛博朋克</option>
+                                            <option value="watercolor">水彩风格</option>
+                                            <option value="anime">动漫风格</option>
+                                            <option value="vintage">复古风格</option>
+                                            <option value="neon">霓虹风格</option>
+                                            <option value="nature">自然风光</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm text-gray-600 mb-1.5">生成数量</label>
+                                        <select id="imageCountSelect" class="w-full px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm">
+                                            <option value="1">1 张</option>
+                                            <option value="2" selected>2 张</option>
+                                            <option value="3">3 张</option>
+                                            <option value="4">4 张</option>
+                                            <option value="6">6 张</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm text-gray-600 mb-1.5">图片比例</label>
+                                        <select id="imageRatioSelect" class="w-full px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm">
+                                            <option value="16:9" selected>16:9 横版</option>
+                                            <option value="4:3">4:3 标准</option>
+                                            <option value="1:1">1:1 正方形</option>
+                                            <option value="3:4">3:4 竖版</option>
+                                            <option value="9:16">9:16 长竖版</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <button id="generateImagesBtn" class="btn-primary w-full md:w-auto text-white px-6 py-2.5 rounded-xl flex items-center justify-center gap-2">
+                                    <i class="fa fa-paint-brush"></i>
+                                    生成 AI 图片
+                                </button>
+                            </div>
+                            
+                            <!-- 本地上传 -->
+                            <div>
+                                <h3 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                                    <i class="fa fa-upload"></i>
+                                    本地上传
+                                </h3>
+                                <div id="uploadArea" class="image-upload-area rounded-xl p-8 text-center cursor-pointer">
+                                    <i class="fa fa-cloud-upload text-4xl text-gray-400 mb-3"></i>
+                                    <p class="text-gray-600 mb-2">拖拽图片到这里或点击上传</p>
+                                    <p class="text-sm text-gray-400">支持 JPG、PNG、WEBP 格式</p>
+                                    <input type="file" id="fileInput" accept="image/*" multiple class="hidden">
+                                </div>
+                            </div>
+                            
+                            <!-- 图片列表 -->
+                            <div>
+                                <h3 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                                    <i class="fa fa-picture-o"></i>
+                                    已添加图片
+                                </h3>
+                                <div id="imagesList" class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                    <div class="text-center text-gray-400 py-8 col-span-full">
+                                        <p>暂无图片</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 底部操作栏 -->
+                    <div class="flex items-center justify-between pt-6 border-t border-gray-100 mt-6 flex-wrap gap-4">
+                        <button id="resetBtn" class="btn-secondary text-white px-6 py-2.5 rounded-xl flex items-center gap-2">
+                            <i class="fa fa-refresh"></i>
+                            重置
+                        </button>
+                        <div class="flex items-center gap-3 flex-wrap">
+                            <button id="generateContentBtn" class="btn-primary text-white px-6 py-2.5 rounded-xl flex items-center gap-2">
+                                <i class="fa fa-lightbulb-o"></i>
+                                生成博客内容
+                            </button>
+                            <button id="copyBtn" class="px-6 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl flex items-center gap-2 transition-colors">
+                                <i class="fa fa-copy"></i>
+                                复制
+                            </button>
+                            <div class="relative">
+                                <button id="exportBtn" class="px-6 py-2.5 bg-green-500 hover:bg-green-600 text-white rounded-xl flex items-center gap-2 transition-colors">
+                                    <i class="fa fa-download"></i>
+                                    导出
+                                    <i class="fa fa-caret-down ml-1"></i>
+                                </button>
+                                <div id="exportDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-10">
+                                    <button class="export-option w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center gap-2" data-format="html">
+                                        <i class="fa fa-globe text-orange-500"></i> HTML 格式
+                                    </button>
+                                    <button class="export-option w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center gap-2" data-format="markdown">
+                                        <i class="fa fa-file-code-o text-blue-500"></i> Markdown 格式
+                                    </button>
+                                    <button class="export-option w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center gap-2" data-format="txt">
+                                        <i class="fa fa-file-text-o text-gray-500"></i> 纯文本格式
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast 提示 -->
+    <div id="toast" class="fixed bottom-8 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-6 py-3 rounded-2xl shadow-lg flex items-center gap-3 z-50 translate-y-20 opacity-0 transition-all duration-300">
+        <span id="toastIcon"></span>
+        <span id="toastMessage"></span>
+    </div>
+
+    <!-- 加载遮罩 -->
+    <div id="loadingOverlay" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-40">
+        <div class="bg-white rounded-2xl p-8 text-center shadow-2xl max-w-sm w-full mx-4">
+            <div class="progress-bar h-2 rounded-full mb-6"></div>
+            <i class="fa fa-spinner fa-spin text-4xl text-blue-500 mb-4"></i>
+            <h3 id="loadingTitle" class="text-lg font-semibold text-gray-800 mb-2">正在生成...</h3>
+            <p id="loadingDesc" class="text-sm text-gray-500">请稍候，AI 正在努力创作中</p>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
